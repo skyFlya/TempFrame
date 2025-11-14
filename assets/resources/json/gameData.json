@@ -1,0 +1,175 @@
+{
+  "levels": [
+    {
+      "level": 1,
+      "bottles": [
+        {
+          "id": 0,
+          "position": { "row": 0, "col": 0 },
+          "blocks": [1, 2, 3, 4],
+          "lockStatus": 0
+        },
+        {
+          "id": 1,
+          "position": { "row": 0, "col": 1 },
+          "blocks": [4, 1, 2, 3],
+          "lockStatus": 0
+        },
+        {
+          "id": 2,
+          "position": { "row": 0, "col": 2 },
+          "blocks": [3, 4, 1, 2],
+          "lockStatus": 0
+        },
+        {
+          "id": 3,
+          "position": { "row": 1, "col": 0 },
+          "blocks": [2, 3, 4, 1],
+          "lockStatus": 0
+        },
+        {
+          "id": 4,
+          "position": { "row": 1, "col": 1 },
+          "blocks": [],
+          "lockStatus": 0
+        },
+        {
+          "id": 5,
+          "position": { "row": 1, "col": 2 },
+          "blocks": [],
+          "lockStatus": 0
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "bottles": [
+        {
+          "id": 0,
+          "position": { "row": 0, "col": 0 },
+          "blocks": [1, 2, 3, 4],
+          "lockStatus": 0
+        },
+        {
+          "id": 1,
+          "position": { "row": 0, "col": 1 },
+          "blocks": [4, 1, 2, 3],
+          "lockStatus": 0
+        },
+        {
+          "id": 2,
+          "position": { "row": 0, "col": 2 },
+          "blocks": [3, 4, 1, 2],
+          "lockStatus": 0
+        },
+        {
+          "id": 3,
+          "position": { "row": 0, "col": 3 },
+          "blocks": [2, 3, 4, 1],
+          "lockStatus": 0
+        },
+        {
+          "id": 4,
+          "position": { "row": 0, "col": 4 },
+          "blocks": [5, 6, 7, 1],
+          "lockStatus": 0
+        },
+        {
+          "id": 5,
+          "position": { "row": 1, "col": 0 },
+          "blocks": [1, 5, 6, 7],
+          "lockStatus": 0
+        },
+        {
+          "id": 6,
+          "position": { "row": 1, "col": 1 },
+          "blocks": [7, 1, 5, 6],
+          "lockStatus": 0
+        },
+        {
+          "id": 7,
+          "position": { "row": 1, "col": 2 },
+          "blocks": [],
+          "lockStatus": 0
+        },
+        {
+          "id": 8,
+          "position": { "row": 1, "col": 3 },
+          "blocks": [],
+          "lockStatus": 0
+        },
+        {
+          "id": 9,
+          "position": { "row": 1, "col": 4 },
+          "blocks": [],
+          "lockStatus": 1
+        }
+      ]
+    },
+    {
+      "level": 11,
+      "bottles": [
+        {
+          "id": 0,
+          "position": { "row": 0, "col": 0 },
+          "blocks": [1, 2, 3, 4],
+          "lockStatus": 0
+        },
+        {
+          "id": 1,
+          "position": { "row": 0, "col": 1 },
+          "blocks": [4, 1, 2, 3],
+          "lockStatus": 0
+        },
+        {
+          "id": 2,
+          "position": { "row": 0, "col": 2 },
+          "blocks": [3, 4, 1, 2],
+          "lockStatus": 0
+        },
+        {
+          "id": 3,
+          "position": { "row": 0, "col": 3 },
+          "blocks": [2, 3, 4, 1],
+          "lockStatus": 0
+        },
+        {
+          "id": 4,
+          "position": { "row": 0, "col": 4 },
+          "blocks": [5, 6, 7, 1],
+          "lockStatus": 0
+        },
+        {
+          "id": 5,
+          "position": { "row": 1, "col": 0 },
+          "blocks": [1, 5, 6, 7],
+          "lockStatus": 0
+        },
+        {
+          "id": 6,
+          "position": { "row": 1, "col": 1 },
+          "blocks": [7, 1, 5, 6],
+          "lockStatus": 0
+        },
+        {
+          "id": 7,
+          "position": { "row": 1, "col": 2 },
+          "blocks": [2, 3, 4, 5],
+          "lockStatus": 0
+        },
+        {
+          "id": 8,
+          "position": { "row": 1, "col": 3 },
+          "blocks": [5, 2, 3, 4],
+          "lockStatus": 0
+        },
+        {
+          "id": 9,
+          "position": { "row": 1, "col": 4 },
+          "blocks": [],
+          "lockStatus": 2
+        }
+      ]
+    }
+  ]
+}
