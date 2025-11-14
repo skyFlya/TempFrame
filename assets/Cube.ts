@@ -1,9 +1,12 @@
-import { _decorator, Component, Sprite, SpriteFrame, resources, Color, tween, Vec3, error } from 'cc';
+import { _decorator, Component, Sprite, SpriteFrame, resources, Color, tween, Vec3 } from 'cc';
 const { ccclass, property } = _decorator;
 
 // 方块图案ID范围
 const MIN_PATTERN_ID = 1;
 const MAX_PATTERN_ID = 7;
+
+// 方块在瓶子中的Y坐标位置（从底部开始）
+const CUBE_Y_POSITIONS = [-196, -48, 100, 248];
 
 @ccclass('Cube')
 export class Cube extends Component {
@@ -12,6 +15,9 @@ export class Cube extends Component {
 
     // 当前图案ID
     private _patternId: number = 0;
+
+    // 方块在瓶子中的索引位置
+    private _index: number = 0;
 
     // 是否被选中
     private _isSelected: boolean = false;
@@ -27,7 +33,7 @@ export class Cube extends Component {
      * 设置方块图案
      * @param patternId 图案ID (1-7)
      */
-    setPattern(patternId: number) {        
+    setPattern(patternId: number) {
         // 验证图案ID范围
         if (patternId < MIN_PATTERN_ID || patternId > MAX_PATTERN_ID) {
             console.warn(`图案ID ${patternId} 超出有效范围 [${MIN_PATTERN_ID}, ${MAX_PATTERN_ID}]`);
@@ -60,6 +66,27 @@ export class Cube extends Component {
     }
 
     /**
+     * 设置方块在瓶子中的索引位置
+     * @param index 索引位置 (0-3)
+     */
+    setIndex(index: number) {
+        if (index >= 0 && index < CUBE_Y_POSITIONS.length) {
+            this._index = index;
+            // 更新Y坐标位置
+            const yPosition = CUBE_Y_POSITIONS[index];
+            this.node.setPosition(new Vec3(0, yPosition, 0));
+        }
+    }
+
+    /**
+     * 获取方块在瓶子中的索引位置
+     * @returns 索引位置
+     */
+    getIndex(): number {
+        return this._index;
+    }
+
+    /**
      * 清除图案
      */
     clearPattern() {
@@ -75,6 +102,7 @@ export class Cube extends Component {
     reset() {
         this.clearPattern();
         this._isSelected = false;
+        this._index = 0;
         if (this.sprite) {
             this.sprite.color = Color.WHITE;
         }

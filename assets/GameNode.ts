@@ -186,14 +186,13 @@ export class GameNode extends Component {
             const cubeNode = instantiate(this.cubePrefab);
             bottleNode.addChild(cubeNode);
             
-            // 设置位置（根据索引确定垂直位置）
-            cubeNode.setPosition(new Vec3(0, index * 20, 0));
-            
-            // 调用cube脚本中的方法来设置图案
+            // 调用cube脚本中的方法来设置图案和位置
             const cubeComponent = cubeNode.getComponent("Cube");
             if (cubeComponent) {
-                // 直接调用setPattern方法
+                // 设置图案
                 (cubeComponent as any).setPattern(blockId);
+                // 设置索引位置
+                (cubeComponent as any).setIndex(index);
                 // 播放出现动画
                 (cubeComponent as any).playAppearAnimation?.();
             }
