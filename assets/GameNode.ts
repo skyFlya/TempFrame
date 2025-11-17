@@ -1,4 +1,4 @@
-import { _decorator, Component, Node, resources, Vec3, tween, UITransform, JsonAsset, Prefab, instantiate, error } from 'cc';
+import { _decorator, Component, Node, resources, Vec3, tween, UITransform, JsonAsset, Prefab, instantiate, error, Quat } from 'cc';
 const { ccclass, property } = _decorator;
 
 // 定义数据接口
@@ -31,6 +31,10 @@ export class GameNode extends Component {
     private bottles: Node[] = [];
     private selectedBottle: Node | null = null;
     private bottleMap: Map<Node, BottleData> = new Map();
+    // 用于存储当前选中瓶子的顶部相同元素
+    private selectedTopBlocks: Node[] = [];
+    // 用于记录动画状态，防止重复点击
+    private isAnimating: boolean = false;
 
     start() {
         this.loadLevel(this.currentLevel);
@@ -75,6 +79,8 @@ export class GameNode extends Component {
         // 清空所有瓶子的数据映射
         this.bottleMap.clear();
         this.selectedBottle = null;
+        this.selectedTopBlocks = [];
+        this.isAnimating = false;
         
         // 获取所有瓶子节点
         const allBottles = [...this.gameLayoutTop.children, ...this.gameLayoutBottom.children];
@@ -200,11 +206,83 @@ export class GameNode extends Component {
     }
 
     /**
+     * 获取瓶子顶部相同颜色的方块
+     * @param bottleNode 瓶子节点
+     * @returns 顶部相同颜色的方块数组
+     */
+    getTopSameColorBlocks(bottleNode: Node): Node[] {
+        const bottleData = this.bottleMap.get(bottleNode);
+        if (!bottleData || bottleData.blocks.length === 0) {
+            return [];
+        }
+
+        // 获取顶部方块的颜色
+        const topBlockColor = bottleData.blocks[bottleData.blocks.length - 1];
+        
+        // 从顶部开始查找相同颜色的方块
+        const sameColorBlocks: Node[] = [];
+        const children = bottleNode.children;
+        
+        // 从后往前遍历（从顶部开始）
+        for (let i = children.length - 1; i >= 0; i--) {
+            const cubeNode = children[i];
+            const cubeComponent = cubeNode.getComponent("Cube");
+            if (cubeComponent) {
+                const patternId = (cubeComponent as any).getPattern();
+                if (patternId === topBlockColor) {
+                    sameColorBlocks.unshift(cubeNode); // 添加到数组开头保持顺序
+                } else {
+                    break; // 遇到不同颜色就停止
+                }
+            }
+        }
+        
+        return sameColorBlocks;
+    }
+
+    /**
+     * 移动方块动画
+     * @param blocks 要移动的方块数组
+     * @param offsetY Y轴偏移量
+     * @param duration 动画持续时间
+     * @param callback 动画完成回调
+     */
+    moveBlocksAnimation(blocks: Node[], offsetY: number, duration: number, callback?: () => void) {
+        if (blocks.length === 0) {
+            if (callback) callback();
+            return;
+        }
+
+        let finishedCount = 0;
+        const totalBlocks = blocks.length;
+        
+        blocks.forEach(block => {
+            const originalPos = block.position.clone();
+            const targetPos = new Vec3(originalPos.x, originalPos.y + offsetY, originalPos.z);
+            
+            tween(block)
+                .to(duration, { position: targetPos })
+                .call(() => {
+                    finishedCount++;
+                    if (finishedCount === totalBlocks && callback) {
+                        callback();
+                    }
+                })
+                .start();
+        });
+    }
+
+    /**
      * 瓶子点击事件
      * @param bottleNode 点击的瓶子节点
      * @param bottleData 瓶子数据
      */
     onBottleClick(bottleNode: Node, bottleData: BottleData) {
+        // 如果正在执行动画，不响应点击
+        if (this.isAnimating) {
+            return;
+        }
+
         // 如果瓶子被锁定，不能操作
         if (bottleData.lockStatus !== 0) {
             // 如果是免费解锁的瓶子，可以解锁
@@ -217,24 +295,32 @@ export class GameNode extends Component {
         // 如果没有选中瓶子，选中当前瓶子
         if (!this.selectedBottle) {
             this.selectedBottle = bottleNode;
-            // 可以添加选中效果
-            bottleNode.setScale(new Vec3(1.1, 1.1, 1.1));
+            
+            // 获取顶部相同颜色的方块
+            this.selectedTopBlocks = this.getTopSameColorBlocks(bottleNode);
+            
+            // 执行向上移动动画作为提示
+            this.moveBlocksAnimation(this.selectedTopBlocks, 50, 0.2, () => {
+                // 动画完成后可以添加其他效果
+            });
+            
             return;
         }
 
-        // 如果点击的是已选中的瓶子，取消选中
+        // 如果点击的是已选中的瓶子，取消选中并回到原位
         if (this.selectedBottle === bottleNode) {
-            this.selectedBottle = null;
-            bottleNode.setScale(new Vec3(1, 1, 1));
+            // 执行回到原位的动画
+            this.moveBlocksAnimation(this.selectedTopBlocks, -50, 0.2, () => {
+                // 动画完成后清理状态
+                this.selectedBottle = null;
+                this.selectedTopBlocks = [];
+            });
+            
             return;
         }
 
-        // 执行倒水操作
+        // 点击的是不同的瓶子，执行倒水操作
         this.pourWater(this.selectedBottle, bottleNode);
-
-        // 取消选中
-        this.selectedBottle.setScale(new Vec3(1, 1, 1));
-        this.selectedBottle = null;
     }
 
     /**
@@ -272,14 +358,128 @@ export class GameNode extends Component {
         if (!fromData || !toData) return;
 
         // 检查倒水条件
-        if (!this.canPour(fromData, toData)) return;
+        const canPourResult = this.canPour(fromData, toData);
+        
+        // 如果不能倒水，回到原位置
+        if (!canPourResult) {
+            // 执行回到原位的动画
+            this.moveBlocksAnimation(this.selectedTopBlocks, -50, 0.2, () => {
+                // 动画完成后清理状态
+                this.selectedBottle = null;
+                this.selectedTopBlocks = [];
+            });
+            return;
+        }
 
-        // 执行倒水
+        // 设置动画状态，防止重复点击
+        this.isAnimating = true;
+
+        // 先让选中方块回到原位
+        this.moveBlocksAnimation(this.selectedTopBlocks, -50, 0.2, () => {
+            // 执行倒水动画
+            this.executePourAnimation(fromBottle, toBottle, fromData, toData, () => {
+                // 动画完成后执行实际的倒水逻辑
+                const pourAmount = this.calculatePourAmount(fromData, toData);
+                this.executePour(fromBottle, toBottle, fromData, toData, pourAmount);
+                
+                // 检查是否完成关卡
+                this.checkLevelComplete();
+                
+                // 重置状态
+                this.selectedBottle = null;
+                this.selectedTopBlocks = [];
+                this.isAnimating = false;
+            });
+        });
+    }
+
+    /**
+     * 执行倒水动画
+     * @param fromBottle 源瓶子节点
+     * @param toBottle 目标瓶子节点
+     * @param fromData 源瓶子数据
+     * @param toData 目标瓶子数据
+     * @param callback 动画完成回调
+     */
+    executePourAnimation(fromBottle: Node, toBottle: Node, fromData: BottleData, toData: BottleData, callback: () => void) {
+        // 计算倒水数量
         const pourAmount = this.calculatePourAmount(fromData, toData);
-        this.executePour(fromBottle, toBottle, fromData, toData, pourAmount);
-
-        // 检查是否完成关卡
-        this.checkLevelComplete();
+        
+        // 获取要移动的方块节点
+        const movingBlocks = this.selectedTopBlocks.slice(-pourAmount);
+        
+        if (movingBlocks.length === 0) {
+            if (callback) callback();
+            return;
+        }
+        
+        // 获取源瓶子和目标瓶子的世界坐标
+        const fromWorldPos = fromBottle.worldPosition.clone();
+        const toWorldPos = toBottle.worldPosition.clone();
+        
+        // 计算中间点坐标（X轴的一半距离）
+        const midX = (fromWorldPos.x + toWorldPos.x) / 2;
+        
+        // 计算目标位置在目标瓶子中的局部坐标
+        const targetIndex = toData.blocks.length;
+        
+        // 对每个方块执行抛物线动画
+        let completedAnimations = 0;
+        
+        movingBlocks.forEach((block, index) => {
+            // 获取方块的世界坐标
+            const blockWorldPos = block.worldPosition.clone();
+            
+            // 计算方块在目标瓶子中的最终位置（局部坐标）
+            const finalLocalPos = new Vec3(0, -196 + (targetIndex + index) * 148, 0);
+            
+            // 转换为世界坐标
+            const toUITransform = toBottle.getComponent(UITransform);
+            const finalWorldPos = toUITransform ? 
+                                 toUITransform.convertToWorldSpaceAR(finalLocalPos) : 
+                                 new Vec3(toWorldPos.x, toWorldPos.y + finalLocalPos.y, toWorldPos.z);
+            
+            // 记录初始旋转角度
+            const initialRotation = block.eulerAngles.clone();
+            
+            // 创建抛物线路径的关键点
+            const startPoint = blockWorldPos;
+            const peakPoint = new Vec3(midX, blockWorldPos.y + 50, blockWorldPos.z);
+            const endPoint = finalWorldPos;
+            
+            // 使用贝塞尔曲线实现更平滑的抛物线运动
+            tween(block)
+                .to(0.6, {}, {
+                    onUpdate: (target, ratio) => {
+                        // 计算贝塞尔曲线上的点
+                        // 二次贝塞尔曲线公式: B(t) = (1-t)²P0 + 2(1-t)tP1 + t²P2
+                        const t = ratio;
+                        const invT = 1 - t;
+                        
+                        // 计算位置
+                        const x = invT * invT * startPoint.x + 2 * invT * t * peakPoint.x + t * t * endPoint.x;
+                        const y = invT * invT * startPoint.y + 2 * invT * t * peakPoint.y + t * t * endPoint.y;
+                        const z = invT * invT * startPoint.z + 2 * invT * t * peakPoint.z + t * t * endPoint.z;
+                        
+                        block.setWorldPosition(new Vec3(x, y, z));
+                        
+                        // 添加旋转动画
+                        const rotation = initialRotation.clone();
+                        rotation.z += 720 * ratio; // 两圈旋转
+                        block.setRotationFromEuler(rotation);
+                    },
+                    easing: 'smooth'
+                })
+                .call(() => {
+                    // 动画结束后重置旋转
+                    block.setRotationFromEuler(initialRotation);
+                    completedAnimations++;
+                    if (completedAnimations === movingBlocks.length) {
+                        if (callback) callback();
+                    }
+                })
+                .start();
+        });
     }
 
     /**
@@ -348,35 +548,9 @@ export class GameNode extends Component {
             }
         }
 
-        // 执行动画效果
-        this.animatePour(fromBottle, toBottle, amount, () => {
-            // 动画完成后更新显示
-            this.loadAndDisplayBlocks(fromBottle, fromData.blocks);
-            this.loadAndDisplayBlocks(toBottle, toData.blocks);
-        });
-    }
-
-    /**
-     * 倒水动画
-     * @param fromBottle 源瓶子节点
-     * @param toBottle 目标瓶子节点
-     * @param amount 倒水数量
-     * @param callback 动画完成回调
-     */
-    animatePour(fromBottle: Node, toBottle: Node, amount: number, callback: () => void) {
-        // 简化的倒水动画
-        // 实际项目中可以实现更复杂的粒子效果或液体流动效果
-        tween(fromBottle)
-            .to(0.3, { scale: new Vec3(0.9, 1.1, 1) })
-            .to(0.3, { scale: new Vec3(1, 1, 1) })
-            .call(() => {
-                tween(toBottle)
-                    .to(0.3, { scale: new Vec3(1.1, 0.9, 1) })
-                    .to(0.3, { scale: new Vec3(1, 1, 1) })
-                    .call(callback)
-                    .start();
-            })
-            .start();
+        // 更新显示
+        this.loadAndDisplayBlocks(fromBottle, fromData.blocks);
+        this.loadAndDisplayBlocks(toBottle, toData.blocks);
     }
 
     /**

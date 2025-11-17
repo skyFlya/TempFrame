@@ -6,7 +6,7 @@
         {
           "id": 0,
           "position": { "row": 0, "col": 0 },
-          "blocks": [1, 2, 3, 4],
+          "blocks": [1, 2, 4, 4],
           "lockStatus": 0
         },
         {
