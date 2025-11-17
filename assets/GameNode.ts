@@ -374,22 +374,19 @@ export class GameNode extends Component {
         // 设置动画状态，防止重复点击
         this.isAnimating = true;
 
-        // 先让选中方块回到原位
-        this.moveBlocksAnimation(this.selectedTopBlocks, -50, 0.2, () => {
-            // 执行倒水动画
-            this.executePourAnimation(fromBottle, toBottle, fromData, toData, () => {
-                // 动画完成后执行实际的倒水逻辑
-                const pourAmount = this.calculatePourAmount(fromData, toData);
-                this.executePour(fromBottle, toBottle, fromData, toData, pourAmount);
-                
-                // 检查是否完成关卡
-                this.checkLevelComplete();
-                
-                // 重置状态
-                this.selectedBottle = null;
-                this.selectedTopBlocks = [];
-                this.isAnimating = false;
-            });
+        // 直接执行倒水动画，不再先回到原位
+        this.executePourAnimation(fromBottle, toBottle, fromData, toData, () => {
+            // 动画完成后执行实际的倒水逻辑
+            const pourAmount = this.calculatePourAmount(fromData, toData);
+            this.executePour(fromBottle, toBottle, fromData, toData, pourAmount);
+            
+            // 检查是否完成关卡
+            this.checkLevelComplete();
+            
+            // 重置状态
+            this.selectedBottle = null;
+            this.selectedTopBlocks = [];
+            this.isAnimating = false;
         });
     }
 
@@ -441,13 +438,29 @@ export class GameNode extends Component {
             
             // 记录初始旋转角度
             const initialRotation = block.eulerAngles.clone();
+            // 记录初始缩放
+            const initialScale = block.scale.clone();
+            // 记录原始父节点和位置信息
+            const originalParent = block.parent;
+            const originalWorldPosition = block.worldPosition.clone();
+            const originalWorldRotation = block.worldRotation.clone();
+            const originalWorldScale = block.worldScale.clone();
+            // 放大到的倍数
+            const targetScale = new Vec3(initialScale.x * 1.2, initialScale.y * 1.2, initialScale.z * 1.2);
             
-            // 创建抛物线路径的关键点
-            const startPoint = blockWorldPos;
-            const peakPoint = new Vec3(midX, blockWorldPos.y + 50, blockWorldPos.z);
+            // 将方块节点添加到当前节点下，确保动画过程中不会被遮挡
+            this.node.addChild(block);
+            // 设置方块的世界位置保持不变
+            block.setWorldPosition(originalWorldPosition);
+            block.setWorldRotation(originalWorldRotation);
+            block.setWorldScale(originalWorldScale);
+            
+            // 创建抛物线路径的关键点（保持200的高度）
+            const startPoint = block.worldPosition.clone();
+            const peakPoint = new Vec3(midX, startPoint.y + 200, startPoint.z);
             const endPoint = finalWorldPos;
             
-            // 使用贝塞尔曲线实现更平滑的抛物线运动
+            // 使用贝塞尔曲线实现更平滑的抛物线运动，并添加缩放动画
             tween(block)
                 .to(0.6, {}, {
                     onUpdate: (target, ratio) => {
@@ -463,6 +476,27 @@ export class GameNode extends Component {
                         
                         block.setWorldPosition(new Vec3(x, y, z));
                         
+                        // 计算缩放（上升时放大，下降时缩小）
+                        let scale;
+                        if (ratio <= 0.5) {
+                            // 前半段上升过程，从1倍放大到1.2倍
+                            const scaleRatio = ratio * 2; // 0 to 1
+                            scale = new Vec3(
+                                initialScale.x + (targetScale.x - initialScale.x) * scaleRatio,
+                                initialScale.y + (targetScale.y - initialScale.y) * scaleRatio,
+                                initialScale.z + (targetScale.z - initialScale.z) * scaleRatio
+                            );
+                        } else {
+                            // 后半段下降过程，从1.2倍缩小到1倍
+                            const scaleRatio = (ratio - 0.5) * 2; // 0 to 1
+                            scale = new Vec3(
+                                targetScale.x + (initialScale.x - targetScale.x) * scaleRatio,
+                                targetScale.y + (initialScale.y - targetScale.y) * scaleRatio,
+                                targetScale.z + (initialScale.z - targetScale.z) * scaleRatio
+                            );
+                        }
+                        block.setScale(scale);
+                        
                         // 添加旋转动画
                         const rotation = initialRotation.clone();
                         rotation.z += 720 * ratio; // 两圈旋转
@@ -471,8 +505,12 @@ export class GameNode extends Component {
                     easing: 'smooth'
                 })
                 .call(() => {
-                    // 动画结束后重置旋转
+                    // 动画结束后将节点添加到目标瓶子节点中
+                    toBottle.addChild(block);
+                    
+                    // 重置旋转和缩放
                     block.setRotationFromEuler(initialRotation);
+                    block.setScale(initialScale);
                     completedAnimations++;
                     if (completedAnimations === movingBlocks.length) {
                         if (callback) callback();
@@ -555,24 +593,37 @@ export class GameNode extends Component {
 
     /**
      * 检查关卡是否完成
+     * 关卡完成的条件是所有试管必须只含有一种颜色的液体（或为空）
      */
     checkLevelComplete() {
         if (!this.levelData) return;
 
-        // 检查是否所有瓶子都满足条件（空或只含同色方块）
+        // 检查是否所有瓶子都满足条件（空或装满同色方块）
         const isComplete = this.levelData.bottles.every(bottleData => {
             // 空瓶子满足条件
             if (bottleData.blocks.length === 0) return true;
 
+            // 非空瓶子必须装满4个相同颜色的方块
+            if (bottleData.blocks.length !== 4) return false;
+            
             // 检查是否所有方块都是同一颜色
             const firstBlock = bottleData.blocks[0];
             return bottleData.blocks.every(block => block === firstBlock);
         });
 
         if (isComplete) {
-            console.log("关卡完成！");
-            // 可以在这里添加过关动画或跳转到下一关
-            // this.nextLevel();
+            // 打印所有瓶子的颜色信息
+            console.log("关卡完成！所有瓶子的颜色信息：");
+            this.levelData.bottles.forEach((bottleData, index) => {
+                if (bottleData.blocks.length === 0) {
+                    console.log(`瓶子 ${index}: 空`);
+                } else {
+                    console.log(`瓶子 ${index}: 颜色 ${bottleData.blocks[0]} (数量: ${bottleData.blocks.length})`);
+                }
+            });
+            
+            // 关卡完成后进入下一关
+            this.nextLevel();
         }
     }
 
